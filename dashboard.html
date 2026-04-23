@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="filename" content="dashboard.html" />
+  <title>运营销售数据看板</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: {
+              50: '#f0f4ff',
+              100: '#e0eaff',
+              200: '#c7d7fe',
+              300: '#a5b4fc',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              800: '#3730a3',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #0f1117; color: #e2e8f0; min-width: 1440px; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1a1d2e; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+    /* Sidebar */
+    .sidebar { width: 240px; min-height: 100vh; background: #0d0f1a; border-right: 1px solid #1e2235; }
+    .nav-item { transition: all 0.2s ease; border-radius: 8px; }
+    .nav-item:hover { background: rgba(99,102,241,0.12); color: #a5b4fc; }
+    .nav-item.active { background: rgba(99,102,241,0.2); color: #818cf8; }
+    .nav-item.active .nav-icon { color: #818cf8; }
+
+    /* Cards */
+    .glass-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      backdrop-filter: blur(12px);
+    }
+    .metric-card {
+      background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .metric-card:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+
+    /* Anomaly badge */
+    .anomaly-badge { animation: pulse-red 2s infinite; }
+    @keyframes pulse-red {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+      50% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+    }
+
+    /* Tab */
+    .tab-btn { transition: all 0.25s ease; border-radius: 8px; }
+    .tab-btn.active { background: rgba(99,102,241,0.25); color: #a5b4fc; }
+    .tab-btn:not(.active):hover { background: rgba(255,255,255,0.05); }
+
+    /* Page */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* Trend up/down */
+    .trend-up { color: #34d399; }
+    .trend-down { color: #f87171; }
+    .trend-neutral { color: #94a3b8; }
+
+    /* Alert item */
+    .alert-item { border-left: 3px solid; transition: background 0.2s; }
+    .alert-item:hover { background: rgba(255,255,255,0.04); }
+    .alert-critical { border-color: #ef4444; }
+    .alert-warning { border-color: #f59e0b; }
+    .alert-info { border-color: #6366f1; }
+
+    /* Progress bar */
+    .progress-bar { height: 6px; border-radius: 3px; background: #1e2235; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 3px; transition: width 1s ease; }
+
+    /* Table */
+    .data-table th { color: #64748b; font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .data-table tr { border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.15s; }
+    .data-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+
+    /* Download btn */
+    .download-btn { transition: all 0.2s ease; }
+    .download-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(99,102,241,0.4); }
+
+    /* Tooltip */
+    .chart-tooltip { background: #1e2235 !important; border: 1px solid #334155 !important; border-radius: 8px !important; }
+
+    /* Glow */
+    .glow-indigo { box-shadow: 0 0 20px rgba(99,102,241,0.15); }
+    .glow-emerald { box-shadow: 0 0 20px rgba(52,211,153,0.15); }
+    .glow-rose { box-shadow: 0 0 20px rgba(248,113,113,0.15); }
+    .glow-amber { box-shadow: 0 0 20px rgba(251,191,36,0.15); }
+
+    /* Notification dot */
+    .notif-dot { width: 8px; height: 8px; background: #ef4444; border-radius: 50%; animation: blink 1.5s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* Modal overlay */
+    .modal-overlay { background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
+
+    /* Fade-in */
+    @keyframes fadeInUp {
+      from { opacity:0; transform:translateY(16px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .fade-in { animation: fadeInUp 0.4s ease forwards; }
+
+    /* Segment bar */
+    .seg-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; }
+    .seg-fill { border-radius: 2px; transition: flex 0.8s ease; }
+  </style>
+</head>
+<body>
+<div class="flex" style="min-width:1440px;">
+
+  <!-- ═══════════════════════ SIDEBAR ═══════════════════════ -->
+  <aside class="sidebar flex flex-col fixed top-0 left-0 h-screen z-30">
+    <!-- Logo -->
+    <div class="px-6 py-5 border-b border-white/5">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+          <i data-lucide="bar-chart-2" class="w-4 h-4 text-white"></i>
+        </div>
+        <div>
+          <div class="text-white font-bold text-sm">DataBoard</div>
+          <div class="text-slate-500 text-xs">运营数据中心</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 px-3 py-4 space-y-1">
+      <div class="text-slate-600 text-xs font-medium px-3 mb-2 uppercase tracking-wider">核心看板</div>
+      <div id="nav-overview" class="nav-item active flex items-center gap-3 px-3 py-2.5 cursor-pointer">
+        <i data-lucide="layout-dashboard" class="nav-icon w-4 h-4 text-slate-400"></i>
+        <span class="text-sm font-medium">总览仪表盘</span>
+      </div>
+      <div id="nav-monthly" class="nav-item flex items-center gap-3 px-3 py-2.5 cursor-pointer">
+        <i data-lucide="calendar" class="nav-icon w-4 h-4 text-slate-400"></i>
+        <span class="text-sm font-medium">月度运营数据</span>
+        <div class="notif-dot ml-auto"></div>
+      </div>
+      <div id="nav-annual" class="nav-item flex items-center gap-3 px-3 py-2.5 cursor-pointer">
+        <i data-lucide="trending-up" class="nav-icon w-4 h-4 text-slate-400"></i>
+        <span class="text-sm font-medium">年度运营数据</span>
+      </div>
+      <div id="nav-sales" class="nav-item flex items-center gap-3 px-3 py-2.5 cursor-pointer">
+        <i data-lucide="shopping-bag" class="nav-icon w-4 h-4 text-slate-400"></i>
+        <span class="text-sm font-medium">销售板块分析</span>
+      </div>
+
+      <div class="text-slate-600 text-xs font-medium px-3 mt-5 mb-2 uppercase tracking-wider">工具</div>
+      <div id="nav-alerts" class="nav-item flex items-center gap-3 px-3 py-2.5 cursor-pointer">
+        <i data-lucide="bell" class="nav-icon w-4 h-4 text-slate-400"></i>
+        <span class="text-sm font-medium">异常预警中心</span>
+        <span class="ml-auto bg-red-500/20 text-red-400 text-xs px-1.5 py-0.5 rounded-full font-medium">3</span>
+      </div>
+      <div id="nav-download" class="nav-item flex items-center gap-3 px-3 py-2.5 cursor-pointer">
+        <i data-lucide="download" class="nav-icon w-4 h-4 text-slate-400"></i>
+        <span class="text-sm font-medium">报表下载</span>
+      </div>
+    </nav>
+
+    <!-- User -->
+    <div class="px-4 py-4 border-t border-white/5">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold">张</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium text-slate-200 truncate">张运营</div>
+          <div class="text-xs text-slate-500">数据分析师</div>
+        </div>
+        <i data-lucide="settings" class="w-4 h-4 text-slate-500 cursor-pointer hover:text-slate-300 transition-colors"></i>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════ MAIN CONTENT ═══════════════════════ -->
+  <main class="flex-1 ml-60 min-h-screen">
+
+    <!-- Top Bar -->
+    <header class="sticky top-0 z-20 px-8 py-4 border-b border-white/5" style="background:rgba(15,17,23,0.92);backdrop-filter:blur(12px);">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 id="page-title" class="text-lg font-bold text-white">总览仪表盘</h1>
+          <p class="text-xs text-slate-500 mt-0.5">数据更新时间：2025年6月15日 09:30</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <!-- Date Range -->
+          <div class="flex items-center gap-2 bg-white/5 border border-white/8 rounded-lg px-3 py-2 text-sm text-slate-300 cursor-pointer hover:bg-white/8 transition-colors">
+            <i data-lucide="calendar-range" class="w-4 h-4 text-slate-400"></i>
+            <span>2025年1月 — 6月</span>
+            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-500"></i>
+          </div>
+          <!-- Alert bell -->
+          <div class="relative">
+            <div id="header-alert-btn" class="w-9 h-9 rounded-lg bg-white/5 border border-white/8 flex items-center justify-center cursor-pointer hover:bg-white/10 transition-colors">
+              <i data-lucide="bell" class="w-4 h-4 text-slate-400"></i>
+            </div>
+            <div class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">3</div>
+          </div>
+          <!-- Download quick -->
+          <div id="header-download-btn" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg cursor-pointer transition-colors">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>导出报表</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ─── PAGE: OVERVIEW ─── -->
+    <div id="page-overview" class="page active px-8 py-6">
+
+      <!-- KPI Row -->
+      <div class="grid grid-cols-4 gap-5 mb-6 fade-in">
+        <!-- MAU -->
+        <div class="metric-card p-5 glow-indigo">
+          <div class="flex items-start justify-between mb-4">
+            <div class="w-10 h-10 rounded-xl bg-indigo-500/15 flex items-center justify-center">
+              <i data-lucide="users" class="w-5 h-5 text-indigo-400"></i>
+            </div>
+            <span class="text-xs font-medium px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-400 trend-up">+12.4%</span>
+          </div>
+          <div class="text-3xl font-bold text-white mb-1">2,847<span class="text-lg text-slate-400">K</span></div>
+          <div class="text-slate-400 text-sm mb-3">月活跃用户 (MAU)</div>
+          <div class="progress-bar"><div class="progress-fill bg-gradient-to-r from-indigo-600 to-indigo-400" style="width:76%"></div></div>
+          <div class="flex justify-between mt-1.5 text-xs text-slate-500">
+            <span>目标：374.7万</span><span>76%</span>
+          </div>
+        </div>
+        <!-- Revenue -->
+        <div class="metric-card p-5 glow-emerald">
+          <div class="flex items-start justify-between mb-4">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center">
+              <i data-lucide="circle-dollar-sign" class="w-5 h-5 text-emerald-400"></i>
+            </div>
+            <span class="text-xs font-medium px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-400">+8.7%</span>
+          </div>
+          <div class="text-3xl font-bold text-white mb-1">¥4,320<span class="text-lg text-slate-400">万</span></div>
+          <div class="text-slate-400 text-sm mb-3">本月总销售额</div>
+          <div class="progress-bar"><div class="progress-fill bg-gradient-to-r from-emerald-600 to-emerald-400" style="width:86%"></div></div>
+          <div class="flex justify-between mt-1.5 text-xs text-slate-500">
+            <span>目标：5000万</span><span>86%</span>
+          </div>
+        </div>
+        <!-- Orders -->
+        <div class="metric-card p-5 glow-amber">
+          <div class="flex items-start justify-between mb-4">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center">
+              <i data-lucide="shopping-cart" class="w-5 h-5 text-amber-400"></i>
+            </div>
+            <span class="text-xs font-medium px-2 py-1 rounded-full bg-rose-500/15 text-rose-400">-3.2%</span>
+          </div>
+          <div class="text-3xl font-bold text-white mb-1">186,420</div>
+          <div class="text-slate-400 text-sm mb-3">本月订单量</div>
+          <div class="progress-bar"><div class="progress-fill bg-gradient-to-r from-amber-600 to-amber-400" style="width:62%"></div></div>
+          <div class="flex justify-between mt-1.5 text-xs text-slate-500">
+            <span>目标：30万</span><span>62%</span>
+          </div>
+        </div>
+        <!-- Retention -->
+        <div class="metric-card p-5 glow-rose">
+          <div class="flex items-start justify-between mb-4">
+            <div class="w-10 h-10 rounded-xl bg-violet-500/15 flex items-center justify-center">
+              <i data-lucide="refresh-cw" class="w-5 h-5 text-violet-400"></i>
+            </div>
+            <span class="text-xs font-medium px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-400">+2.1%</span>
+          </div>
+          <div class="text-3xl font-bold text-white mb-1">68.3<span class="text-lg text-slate-400">%</span></div>
+          <div class="text-slate-400 text-sm mb-3">用户留存率</div>
+          <div class="progress-bar"><div class="progress-fill bg-gradient-to-r from-violet-600 to-violet-400" style="width:68%"></div></div>
+          <div class="flex justify-between mt-1.5 text-xs text-slate-500">
+            <span>目标：75%</span><span>91%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Row 1 -->
+      <div class="grid grid-cols-3 gap-5 mb-5">
+        <!-- Revenue Trend -->
+        <div class="glass-card p-5 col-span-2 fade-in">
+          <div class="flex items-center justify-between mb-5">
+            <div>
+              <h3 class="font-semibold text-white">营收趋势</h3>
+              <p class="text-xs text-slate-500 mt-0.5">2025年1—6月 月度销售额对比</p>
+            </div>
+            <div class="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+              <button id="trend-mom-btn" class="tab-btn active text-xs px-3 py-1.5 text-slate-300 font-medium">环比</button>
+              <button id="trend-yoy-btn" class="tab-btn text-xs px-3 py-1.5 text-slate-400 font-medium">同比</button>
+            </div>
+          </div>
+          <canvas id="revenueTrendChart" height="200"></canvas>
+        </div>
+
+        <!-- Anomaly Alert Panel -->
+        <div class="glass-card p-5 fade-in">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+              <div class="anomaly-badge w-2.5 h-2.5 rounded-full bg-red-500"></div>
+              <h3 class="font-semibold text-white">异常预警</h3>
+            </div>
+            <span id="view-all-alerts" class="text-xs text-indigo-400 cursor-pointer hover:text-indigo-300">查看全部</span>
+          </div>
+          <div class="space-y-3" id="overview-alert-list">
+            <!-- filled by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Row 2 -->
+      <div class="grid grid-cols-3 gap-5">
+        <!-- Sales by Segment -->
+        <div class="glass-card p-5 fade-in">
+          <div class="flex items-center justify-between mb-5">
+            <div>
+              <h3 class="font-semibold text-white">销售板块占比</h3>
+              <p class="text-xs text-slate-500 mt-0.5">本月各板块贡献</p>
+            </div>
+          </div>
+          <canvas id="segmentPieChart" height="200"></canvas>
+          <div class="mt-4 space-y-2" id="segment-legend"></div>
+        </div>
+
+        <!-- User Activity -->
+        <div class="glass-card p-5 fade-in">
+          <div class="flex items-center justify-between mb-5">
+            <div>
+              <h3 class="font-semibold text-white">用户活跃趋势</h3>
+              <p class="text-xs text-slate-500 mt-0.5">DAU/WAU/MAU 走势</p>
+            </div>
+          </div>
+          <canvas id="activityChart" height="200"></canvas>
+        </div>
+
+        <!-- Top Boards Table -->
+        <div class="glass-card p-5 fade-in">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-white">板块销售排行</h3>
+            <span class="text-xs text-slate-500">本月数据</span>
+          </div>
+          <table class="w-full data-table">
+            <thead>
+              <tr>
+                <th class="text-left py-2">板块</th>
+                <th class="text-right py-2">销售额</th>
+                <th class="text-right py-2">环比</th>
+              </tr>
+            </thead>
+            <tbody id="segment-rank-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── PAGE: MONTHLY ─── -->
+    <div id="page-monthly" class="page px-8 py-6">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="text-xl font-bold text-white">月度运营数据</h2>
+          <p class="text-sm text-slate-500 mt-1">展示月活、次月留存、新增用户及各板块销售环比/同比分析</p>
+        </div>
+        <!-- Month selector -->
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1 bg-white/5 border border-white/8 rounded-lg">
+            <button id="month-prev" class="p-2 text-slate-400 hover:text-white transition-colors"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+            <span id="month-label" class="text-sm font-medium text-white px-3">2025年6月</span>
+            <button id="month-next" class="p-2 text-slate-400 hover:text-white transition-colors"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Monthly KPI -->
+      <div class="grid grid-cols-5 gap-4 mb-6">
+        <div class="metric-card p-4">
+          <div class="text-xs text-slate-500 mb-2">月活用户 MAU</div>
+          <div class="text-2xl font-bold text-white">284.7万</div>
+          <div class="flex items-center gap-1 mt-2">
+            <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span class="text-xs text-emerald-400 font-medium">+12.4% 环比</span>
+          </div>
+          <div class="flex items-center gap-1 mt-0.5">
+            <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-indigo-400"></i>
+            <span class="text-xs text-indigo-400 font-medium">+28.6% 同比</span>
+          </div>
+        </div>
+        <div class="metric-card p-4">
+          <div class="text-xs text-slate-500 mb-2">新增用户</div>
+          <div class="text-2xl font-bold text-white">43.2万</div>
+          <div class="flex items-center gap-1 mt-2">
+            <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span class="text-xs text-emerald-400 font-medium">+6.8% 环比</span>
+          </div>
+          <div class="flex items-center gap-1 mt-0.5">
+            <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-indigo-400"></i>
+            <span class="text-xs text-indigo-400 font-medium">+32.1% 同比</span>
+          </div>
+        </div>
+        <div class="metric-card p-4">
+          <div class="text-xs text-slate-500 mb-2">次月留存率</div>
+          <div class="text-2xl font-bold text-white">68.3%</div>
+          <div class="flex items-center gap-1 mt-2">
+            <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span class="text-xs text-emerald-400 font-medium">+2.1% 环比</span>
+          </div>
+          <div class="flex items-center gap-1 mt-0.5">
+            <i data-lucide="arrow-down-right" class="w-3.5 h-3.5 text-rose-400"></i>
+            <span class="text-xs text-rose-400 font-medium">-1.4% 同比</span>
+          </div>
+        </div>
+        <div class="metric-card p-4">
+          <div class="text-xs text-slate-500 mb-2">付费转化率</div>
+          <div class="text-2xl font-bold text-white">14.7%</div>
+          <div class="flex items-center gap-1 mt-2">
+            <i data-lucide="arrow-down-right" class="w-3.5 h-3.5 text-rose-400"></i>
+            <span class="text-xs text-rose-400 font-medium">-0.8% 环比</span>
+          </div>
+          <div class="flex items-center gap-1 mt-0.5">
+            <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-indigo-400"></i>
+            <span class="text-xs text-indigo-400 font-medium">+3.2% 同比</span>
+          </div>
+        </div>
+        <div class="metric-card p-4">
+          <div class="text-xs text-slate-500 mb-2">月均使用时长</div>
+          <div class="text-2xl font-bold text-white">38.4<span class="text-base text-slate-400">min</span></div>
+          <div class="flex items-center gap-1 mt-2">
+            <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span class="text-xs text-emerald-400 font-medium">+4.2% 环比</span>
+          </div>
+          <div class="flex items-center gap-1 mt-0.5">
+            <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-indigo-400"></i>
+            <span class="text-xs text-indigo-400 font-medium">+15.8% 同比</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="grid grid-cols-2 gap-5 mb-5">
+        <div class="glass-card p-5">
+          <h3 class="font-semibold text-white mb-1">月度活跃用户趋势（近12月）</h3>
+          <p class="text-xs text-slate-500 mb-4">MAU 走势及环比/同比对比</p>
+          <canvas id="monthlyMauChart" height="220"></canvas>
+        </div>
+        <div class="glass-card p-5">
+          <h3 class="font-semibold text-white mb-1">各板块月度销售额对比</h3>
+          <p class="text-xs text-slate-500 mb-4">环比变化百分比</p>
+          <canvas id="monthlySalesChart" height="220"></canvas>
+        </div>
+      </div>
+
+      <!-- Detailed Table -->
+      <div class="glass-card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold text-white">月度运营明细表</h3>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-500">近6个月</span>
+            <button id="dl-monthly-btn" class="download-btn flex items-center gap-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs px-3 py-1.5 rounded-lg font-medium">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>下载 Excel
+            </button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full data-table text-sm">
+            <thead>
+              <tr>
+                <th class="text-left py-3 pr-4">月份</th>
+                <th class="text-right py-3 px-4">MAU</th>
+                <th class="text-right py-3 px-4">新增用户</th>
+                <th class="text-right py-3 px-4">订单量</th>
+                <th class="text-right py-3 px-4">销售额</th>
+                <th class="text-right py-3 px-4">环比</th>
+                <th class="text-right py-3 px-4">同比</th>
+                <th class="text-right py-3 pl-4">留存率</th>
+              </tr>
+            </thead>
+            <tbody id="monthly-detail-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── PAGE: ANNUAL ─── -->
+    <div id="page-annual" class="page px-8 py-6">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="text-xl font-bold text-white">年度运营数据</h2>
+          <p class="text-sm text-slate-500 mt-1">全年运营活跃数据、各板块销售及同比分析</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1 bg-white/5 border border-white/8 rounded-lg">
+            <button id="year-prev" class="p-2 text-slate-400 hover:text-white transition-colors"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+            <span id="year-label" class="text-sm font-medium text-white px-3">2025年</span>
+            <button id="year-next" class="p-2 text-slate-400 hover:text-white transition-colors"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Annual KPI -->
+      <div class="grid grid-cols-4 gap-5 mb-6">
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="users" class="w-4 h-4 text-indigo-400"></i>
+            <span class="text-xs text-slate-400">年活跃用户</span>
+          </div>
+          <div class="text-3xl font-bold text-white mb-1">1,847万</div>
+          <div class="flex gap-4 text-xs mt-2">
+            <span class="text-emerald-400">+24.3% 同比</span>
+          </div>
+        </div>
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="circle-dollar-sign" class="w-4 h-4 text-emerald-400"></i>
+            <span class="text-xs text-slate-400">年度总销售额</span>
+          </div>
+          <div class="text-3xl font-bold text-white mb-1">¥4.7亿</div>
+          <div class="flex gap-4 text-xs mt-2">
+            <span class="text-emerald-400">+18.6% 同比</span>
+          </div>
+        </div>
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="shopping-cart" class="w-4 h-4 text-amber-400"></i>
+            <span class="text-xs text-slate-400">年度总订单量</span>
+          </div>
+          <div class="text-3xl font-bold text-white mb-1">218.4万</div>
+          <div class="flex gap-4 text-xs mt-2">
+            <span class="text-emerald-400">+11.2% 同比</span>
+          </div>
+        </div>
+        <div class="metric-card p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="zap" class="w-4 h-4 text-violet-400"></i>
+            <span class="text-xs text-slate-400">客单价</span>
+          </div>
+          <div class="text-3xl font-bold text-white mb-1">¥215</div>
+          <div class="flex gap-4 text-xs mt-2">
+            <span class="text-emerald-400">+6.7% 同比</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Annual Charts -->
+      <div class="grid grid-cols-2 gap-5 mb-5">
+        <div class="glass-card p-5">
+          <h3 class="font-semibold text-white mb-1">年度月度营收分布</h3>
+          <p class="text-xs text-slate-500 mb-4">与去年同期对比</p>
+          <canvas id="annualRevenueChart" height="240"></canvas>
+        </div>
+        <div class="glass-card p-5">
+          <h3 class="font-semibold text-white mb-1">各板块年度销售额同比</h3>
+          <p class="text-xs text-slate-500 mb-4">今年 vs 去年</p>
+          <canvas id="annualSegmentChart" height="240"></canvas>
+        </div>
+      </div>
+
+      <!-- Annual Heatmap style table -->
+      <div class="glass-card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold text-white">年度各月板块销售汇总</h3>
+          <button id="dl-annual-btn" class="download-btn flex items-center gap-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs px-3 py-1.5 rounded-lg font-medium">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>下载 Excel
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full data-table text-xs">
+            <thead>
+              <tr>
+                <th class="text-left py-3 pr-4">板块</th>
+                <th class="text-right py-3 px-2">1月</th>
+                <th class="text-right py-3 px-2">2月</th>
+                <th class="text-right py-3 px-2">3月</th>
+                <th class="text-right py-3 px-2">4月</th>
+                <th class="text-right py-3 px-2">5月</th>
+                <th class="text-right py-3 px-2">6月</th>
+                <th class="text-right py-3 px-2">7月</th>
+                <th class="text-right py-3 px-2">8月</th>
+                <th class="text-right py-3 px-2">9月</th>
+                <th class="text-right py-3 px-2">10月</th>
+                <th class="text-right py-3 px-2">11月</th>
+                <th class="text-right py-3 px-2">12月</th>
+                <th class="text-right py-3 pl-4">全年</th>
+                <th class="text-right py-3 pl-4">同比</th>
+              </tr>
+            </thead>
+            <tbody id="annual-detail-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── PAGE: SALES ─── -->
+    <div id="page-sales" class="page px-8 py-6">
+      <div class="mb-6">
+        <h2 class="text-xl font-bold text-white">销售板块分析</h2>
+        <p class="text-sm text-slate-500 mt-1">各板块详细销售数据、用户分布及转化漏斗</p>
+      </div>
+
+      <!-- Segment Cards -->
+      <div class="grid grid-cols-4 gap-4 mb-6" id="segment-cards"></div>
+
+      <!-- Charts -->
+      <div class="grid grid-cols-3 gap-5 mb-5">
+        <div class="glass-card p-5 col-span-2">
+          <h3 class="font-semibold text-white mb-1">各板块销售额月度趋势</h3>
+          <p class="text-xs text-slate-500 mb-4">近6个月各板块对比</p>
+          <canvas id="salesSegmentTrendChart" height="220"></canvas>
+        </div>
+        <div class="glass-card p-5">
+          <h3 class="font-semibold text-white mb-1">板块用户结构</h3>
+          <p class="text-xs text-slate-500 mb-4">各板块付费用户占比</p>
+          <canvas id="salesUserPieChart" height="200"></canvas>
+          <div class="mt-3 space-y-1.5" id="sales-pie-legend"></div>
+        </div>
+      </div>
+
+      <!-- Conversion Table -->
+      <div class="glass-card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold text-white">板块转化数据明细</h3>
+          <button id="dl-sales-btn" class="download-btn flex items-center gap-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs px-3 py-1.5 rounded-lg font-medium">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>下载 Excel
+          </button>
+        </div>
+        <table class="w-full data-table text-sm">
+          <thead>
+            <tr>
+              <th class="text-left py-3 pr-4">板块名称</th>
+              <th class="text-right py-3 px-4">活跃用户</th>
+              <th class="text-right py-3 px-4">付费用户</th>
+              <th class="text-right py-3 px-4">转化率</th>
+              <th class="text-right py-3 px-4">订单量</th>
+              <th class="text-right py-3 px-4">销售额</th>
+              <th class="text-right py-3 px-4">客单价</th>
+              <th class="text-right py-3 px-4">环比</th>
+              <th class="text-right py-3 pl-4">同比</th>
+            </tr>
+          </thead>
+          <tbody id="sales-detail-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ─── PAGE: ALERTS ─── -->
+    <div id="page-alerts" class="page px-8 py-6">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="text-xl font-bold text-white">异常预警中心</h2>
+          <p class="text-sm text-slate-500 mt-1">实时监控关键指标，自动识别异常波动</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1 bg-white/5 border border-white/8 rounded-lg p-1 text-xs">
+            <button id="alert-filter-all" class="tab-btn active px-3 py-1.5 text-slate-300 font-medium">全部</button>
+            <button id="alert-filter-critical" class="tab-btn px-3 py-1.5 text-slate-400 font-medium">严重</button>
+            <button id="alert-filter-warning" class="tab-btn px-3 py-1.5 text-slate-400 font-medium">警告</button>
+            <button id="alert-filter-info" class="tab-btn px-3 py-1.5 text-slate-400 font-medium">提示</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alert Stats -->
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="metric-card p-4 border-l-2 border-red-500">
+          <div class="flex items-center gap-2 mb-2"><i data-lucide="alert-circle" class="w-4 h-4 text-red-400"></i><span class="text-xs text-slate-400">严重异常</span></div>
+          <div class="text-3xl font-bold text-red-400">3</div>
+          <div class="text-xs text-slate-500 mt-1">需立即处理</div>
+        </div>
+        <div class="metric-card p-4 border-l-2 border-amber-500">
+          <div class="flex items-center gap-2 mb-2"><i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i><span class="text-xs text-slate-400">一般警告</span></div>
+          <div class="text-3xl font-bold text-amber-400">5</div>
+          <div class="text-xs text-slate-500 mt-1">建议关注</div>
+        </div>
+        <div class="metric-card p-4 border-l-2 border-indigo-500">
+          <div class="flex items-center gap-2 mb-2"><i data-lucide="info" class="w-4 h-4 text-indigo-400"></i><span class="text-xs text-slate-400">提示信息</span></div>
+          <div class="text-3xl font-bold text-indigo-400">8</div>
+          <div class="text-xs text-slate-500 mt-1">关注即可</div>
+        </div>
+      </div>
+
+      <!-- Alerts List -->
+      <div class="glass-card p-5">
+        <div id="alerts-full-list" class="space-y-2"></div>
+      </div>
+    </div>
+
+    <!-- ─── PAGE: DOWNLOAD ─── -->
+    <div id="page-download" class="page px-8 py-6">
+      <div class="mb-6">
+        <h2 class="text-xl font-bold text-white">报表下载中心</h2>
+        <p class="text-sm text-slate-500 mt-1">按需下载月度、年度、板块及自定义区间报表</p>
+      </div>
+
+      <!-- Quick Download Cards -->
+      <div class="grid grid-cols-3 gap-5 mb-8">
+        <div class="glass-card p-6 hover:border-indigo-500/40 transition-colors cursor-pointer group" id="dl-quick-monthly">
+          <div class="w-12 h-12 rounded-xl bg-indigo-500/15 flex items-center justify-center mb-4 group-hover:bg-indigo-500/25 transition-colors">
+            <i data-lucide="file-spreadsheet" class="w-6 h-6 text-indigo-400"></i>
+          </div>
+          <h3 class="font-semibold text-white mb-1">月度运营报表</h3>
+          <p class="text-sm text-slate-400 mb-4">包含月活、新增、留存、销售额等核心月度数据</p>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-500">Excel / PDF</span>
+            <div class="flex gap-2">
+              <button id="dl-monthly-excel" class="download-btn text-xs bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 px-3 py-1.5 rounded-lg font-medium hover:bg-indigo-600/30">Excel</button>
+              <button id="dl-monthly-pdf" class="download-btn text-xs bg-slate-700/50 border border-white/10 text-slate-300 px-3 py-1.5 rounded-lg font-medium hover:bg-slate-700/80">PDF</button>
+            </div>
+          </div>
+        </div>
+        <div class="glass-card p-6 hover:border-emerald-500/40 transition-colors cursor-pointer group" id="dl-quick-annual">
+          <div class="w-12 h-12 rounded-xl bg-emerald-500/15 flex items-center justify-center mb-4 group-hover:bg-emerald-500/25 transition-colors">
+            <i data-lucide="file-bar-chart" class="w-6 h-6 text-emerald-400"></i>
+          </div>
+          <h3 class="font-semibold text-white mb-1">年度运营报表</h3>
+          <p class="text-sm text-slate-400 mb-4">全年数据汇总，含各月度趋势与同比对比分析</p>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-500">Excel / PDF</span>
+            <div class="flex gap-2">
+              <button id="dl-annual-excel" class="download-btn text-xs bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 px-3 py-1.5 rounded-lg font-medium hover:bg-emerald-600/30">Excel</button>
+              <button id="dl-annual-pdf" class="download-btn text-xs bg-slate-700/50 border border-white/10 text-slate-300 px-3 py-1.5 rounded-lg font-medium hover:bg-slate-700/80">PDF</button>
+            </div>
+          </div>
+        </div>
+        <div class="glass-card p-6 hover:border-amber-500/40 transition-colors cursor-pointer group" id="dl-quick-sales">
+          <div class="w-12 h-12 rounded-xl bg-amber-500/15 flex items-center justify-center mb-4 group-hover:bg-amber-500/25 transition-colors">
+            <i data-lucide="file-text" class="w-6 h-6 text-amber-400"></i>
+          </div>
+          <h3 class="font-semibold text-white mb-1">销售板块报表</h3>
+          <p class="text-sm text-slate-400 mb-4">各板块详细销售明细、转化漏斗与环比同比</p>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-slate-500">Excel / PDF</span>
+            <div class="flex gap-2">
+              <button id="dl-sales-excel" class="download-btn text-xs bg-amber-600/20 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-lg font-medium hover:bg-amber-600/30">Excel</button>
+              <button id="dl-sales-pdf" class="download-btn text-xs bg-slate-700/50 border border-white/10 text-slate-300 px-3 py-1.5 rounded-lg font-medium hover:bg-slate-700/80">PDF</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Custom Range -->
+      <div class="glass-card p-6 mb-6">
+        <h3 class="font-semibold text-white mb-4">自定义区间报表</h3>
+        <div class="grid grid-cols-4 gap-4 items-end">
+          <div>
+            <label class="block text-xs text-slate-400 mb-2">开始月份</label>
+            <input type="month" id="custom-start" value="2025-01" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500/60 transition-colors" />
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-2">结束月份</label>
+            <input type="month" id="custom-end" value="2025-06" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500/60 transition-colors" />
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-2">报表类型</label>
+            <select id="custom-type" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500/60 transition-colors">
+              <option value="full" class="bg-gray-900">完整报表</option>
+              <option value="ops" class="bg-gray-900">运营数据</option>
+              <option value="sales" class="bg-gray-900">销售数据</option>
+              <option value="alert" class="bg-gray-900">异常报告</option>
+            </select>
+          </div>
+          <button id="dl-custom-btn" class="download-btn flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-medium text-sm transition-all">
+            <i data-lucide="download" class="w-4 h-4"></i>生成并下载
+          </button>
+        </div>
+      </div>
+
+      <!-- Download History -->
+      <div class="glass-card p-5">
+        <h3 class="font-semibold text-white mb-4">下载历史</h3>
+        <table class="w-full data-table text-sm">
+          <thead>
+            <tr>
+              <th class="text-left py-3 pr-4">报表名称</th>
+              <th class="text-left py-3 px-4">类型</th>
+              <th class="text-left py-3 px-4">生成时间</th>
+              <th class="text-left py-3 px-4">文件大小</th>
+              <th class="text-right py-3 pl-4">操作</th>
+            </tr>
+          </thead>
+          <tbody id="download-history-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══ DOWNLOAD TOAST ═══ -->
+<div id="toast" class="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-slate-800 border border-white/10 text-white px-5 py-3 rounded-xl shadow-2xl transition-all duration-300 translate-y-20 opacity-0">
+  <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+  <span id="toast-msg" class="text-sm font-medium">报表生成成功，开始下载…</span>
+</div>
+
+<!-- ═══════════════════════ SCRIPTS ═══════════════════════ -->
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────
+const MONTHS = ['1月','2月','3月','4月','5月','6月'];
+const MONTHS_FULL = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+const SEGMENTS = ['电商零售','企业服务','内容付费','游戏娱乐','本地生活'];
+const SEG_COLORS = ['#6366f1','#34d399','#f59e0b','#f87171','#a78bfa'];
+const SEG_BG    = ['rgba(99,102,241,0.15)','rgba(52,211,153,0.15)','rgba(245,158,11,0.15)','rgba(248,113,113,0.15)','rgba(167,139,250,0.15)'];
+
+// Monthly revenue (万元)
+const revenueData = [3820, 3640, 4010, 4180, 4050, 4320];
+const revenueYOY  = [3240, 3010, 3480, 3620, 3550, 3780];
+
+// MAU (万)
+const mauData    = [241, 238, 253, 264, 253, 285];
+const mauLastYear = [188, 183, 198, 207, 196, 221];
+
+// Segment monthly sales (万元)
+const segMonthly = {
+  '电商零售':  [1420,1380,1560,1620,1580,1680],
+  '企业服务':  [860, 820, 900, 940, 910, 980],
+  '内容付费':  [680, 640, 710, 730, 720, 760],
+  '游戏娱乐':  [520, 490, 540, 560, 540, 580],
+  '本地生活':  [340, 310, 300, 330, 300, 320]
+};
+
+// Annual segment data (万元) - 12 months + total
+const annualData = {
+  '电商零售':  [1200,1100,1350,1420,1520,1580,1640,1700,1820,1950,2100,2200,19580,'+18.2%'],
+  '企业服务':  [720, 680, 780, 860, 880, 980, 1020,1050,1100,1180,1240,1300,11790,'+22.4%'],
+  '内容付费':  [560, 520, 620, 710, 720, 760, 790, 820, 870, 920, 980, 1020,9290, '+15.8%'],
+  '游戏娱乐':  [440, 400, 480, 540, 550, 580, 600, 630, 660, 710, 750, 800, 7140, '+12.6%'],
+  '本地生活':  [280, 250, 270, 310, 310, 320, 340, 360, 380, 410, 430, 460, 4120, '+9.4%']
+};
+
+// Alert data
+const alertsData = [
+  { id:'a1', level:'critical', title:'电商零售板块订单量骤降', desc:'本月订单量环比下降 18.3%，超出预警阈值（-10%）', time:'2小时前', metric:'订单量: 48,200 vs 59,000', icon:'alert-circle' },
+  { id:'a2', level:'critical', title:'付费转化率持续下滑', desc:'近3个月付费转化率从16.2%降至14.7%，累计下降9.3%', time:'5小时前', metric:'当前转化率: 14.7%', icon:'alert-circle' },
+  { id:'a3', level:'critical', title:'本地生活板块月活异常', desc:'6月月活环比下降 12.1%，同比下降 5.6%', time:'1天前', metric:'MAU: 18.2万 vs 20.7万', icon:'alert-circle' },
+  { id:'a4', level:'warning', title:'内容付费次月留存下降', desc:'次月留存率环比下降 4.2%，需关注用户粘性', time:'2天前', metric:'留存率: 61.3%', icon:'alert-triangle' },
+  { id:'a5', level:'warning', title:'游戏娱乐 DAU 低于预期', desc:'日活跃用户较目标值低 8.4%', time:'3天前', metric:'DAU: 12.4万 vs 目标13.5万', icon:'alert-triangle' },
+  { id:'a6', level:'warning', title:'企业服务续费率下滑', desc:'续费率从89.2%降至84.7%，环比下降4.5%', time:'3天前', metric:'续费率: 84.7%', icon:'alert-triangle' },
+  { id:'a7', level:'warning', title:'获客成本上升', desc:'CAC 环比上升 11.2%，LTV/CAC 比值下降', time:'4天前', metric:'CAC: ¥42.6 → ¥47.4', icon:'alert-triangle' },
+  { id:'a8', level:'warning', title:'电商退款率偏高', desc:'退款率本月达 3.8%，超行业均值 2.5%', time:'5天前', metric:'退款率: 3.8%', icon:'alert-triangle' },
+  { id:'a9', level:'info', title:'企业服务新签合同额创新高', desc:'本月新签合同额达 980 万，环比增长 7.7%', time:'1天前', metric:'新签: ¥980万', icon:'info' },
+  { id:'a10', level:'info', title:'内容付费 VIP 用户增长良好', desc:'VIP 用户环比增长 8.4%', time:'2天前', metric:'VIP用户: 84,200', icon:'info' },
+  { id:'a11', level:'info', title:'系统数据更新完成', desc:'月度数据已全量同步至数据仓库', time:'6小时前', metric:'数据时效: 2025-06-15', icon:'info' },
+  { id:'a12', level:'info', title:'报表定时任务已执行', desc:'月度自动报告已发送至相关负责人', time:'1天前', metric:'接收人: 8位', icon:'info' },
+  { id:'a13', level:'info', title:'游戏娱乐新用户质量提升', desc:'新用户7日留存率同比提升 5.2%', time:'3天前', metric:'7日留存: 34.6%', icon:'info' },
+  { id:'a14', level:'info', title:'本地生活节假日营销效果待评估', desc:'劳动节活动ROI分析报告已生成', time:'4天前', metric:'ROI: 3.2x', icon:'info' },
+  { id:'a15', level:'info', title:'年度目标完成进度良好', desc:'上半年整体营收完成率达 91.4%', time:'5天前', metric:'完成率: 91.4%', icon:'info' },
+  { id:'a16', level:'info', title:'数据看板配置更新', desc:'新增同比环比对比图表模块', time:'7天前', metric:'模块: 5个', icon:'info' },
+];
+
+// Sales detail
+const salesDetail = [
+  { name:'电商零售', color:'#6366f1', bg:'rgba(99,102,241,0.1)', active:'168.4万', paid:'24.7万', conv:'14.7%', orders:'82,400', sales:'¥1,680万', arpu:'¥204', mom:'+6.3%', yoy:'+18.2%', momVal:6.3 },
+  { name:'企业服务', color:'#34d399', bg:'rgba(52,211,153,0.1)', active:'42.6万', paid:'18.2万', conv:'42.7%', orders:'38,600', sales:'¥980万', arpu:'¥539', mom:'+7.7%', yoy:'+22.4%', momVal:7.7 },
+  { name:'内容付费', color:'#f59e0b', bg:'rgba(245,158,11,0.1)', active:'86.3万', paid:'12.4万', conv:'14.4%', orders:'37,200', sales:'¥760万', arpu:'¥203', mom:'+5.6%', yoy:'+15.8%', momVal:5.6 },
+  { name:'游戏娱乐', color:'#f87171', bg:'rgba(248,113,113,0.1)', active:'64.2万', paid:'9.6万', conv:'14.9%', orders:'22,400', sales:'¥580万', arpu:'¥242', mom:'+7.4%', yoy:'+12.6%', momVal:7.4 },
+  { name:'本地生活', color:'#a78bfa', bg:'rgba(167,139,250,0.1)', active:'18.2万', paid:'3.8万', conv:'20.9%', orders:'5,820', sales:'¥320万', arpu:'¥180', mom:'-5.9%', yoy:'+9.4%', momVal:-5.9 },
+];
+
+// Download history
+const dlHistory = [
+  { name:'2025年5月月度运营报表', type:'Excel', time:'2025-06-01 09:00', size:'2.4 MB' },
+  { name:'2025年Q1季度销售报表', type:'PDF', time:'2025-04-08 14:32', size:'1.8 MB' },
+  { name:'2024年度运营总结报表', type:'Excel', time:'2025-01-15 10:20', size:'4.1 MB' },
+  { name:'2025年4月异常数据报告', type:'PDF', time:'2025-05-06 16:45', size:'0.9 MB' },
+  { name:'Q1各板块销售分析', type:'Excel', time:'2025-04-02 11:00', size:'3.2 MB' },
+];
+
+// ─── STATE ───────────────────────────────────────────────────────────
+let currentPage = 'overview';
+let alertFilter = 'all';
+let trendMode = 'mom'; // mom | yoy
+let currentMonth = 6;
+let currentYear = 2025;
+
+// ─── CHARTS ──────────────────────────────────────────────────────────
+let charts = {};
+
+const CHART_DEFAULTS = {
+  color: '#94a3b8',
+  grid: 'rgba(255,255,255,0.06)',
+  tooltip: {
+    backgroundColor: '#1e2235',
+    borderColor: '#334155',
+    borderWidth: 1,
+    titleColor: '#e2e8f0',
+    bodyColor: '#94a3b8',
+    padding: 12,
+    cornerRadius: 8,
+  }
+};
+
+function destroyChart(key) {
+  if (charts[key]) { charts[key].destroy(); delete charts[key]; }
+}
+
+function buildRevenueTrend() {
+  destroyChart('revenueTrend');
+  const ctx = document.getElementById('revenueTrendChart');
+  if (!ctx) return;
+  const label = trendMode === 'mom' ? '环比参考（上月）' : '同比参考（去年同期）';
+  const compareData = trendMode === 'mom'
+    ? [null, revenueData[0], revenueData[1], revenueData[2], revenueData[3], revenueData[4]]
+    : revenueYOY;
+  charts['revenueTrend'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: MONTHS,
+      datasets: [
+        {
+          label: '本期销售额（万元）',
+          data: revenueData,
+          backgroundColor: 'rgba(99,102,241,0.7)',
+          borderRadius: 6,
+          borderSkipped: false,
+          order: 2
+        },
+        {
+          label,
+          data: compareData,
+          type: 'line',
+          borderColor: '#34d399',
+          backgroundColor: 'rgba(52,211,153,0.1)',
+          pointBackgroundColor: '#34d399',
+          pointRadius: 4,
+          tension: 0.4,
+          fill: false,
+          order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: '#94a3b8', font:{ size:11 } } }, tooltip: CHART_DEFAULTS.tooltip },
+      scales: {
+        x: { ticks: { color: '#64748b' }, grid: { color: CHART_DEFAULTS.grid } },
+        y: { ticks: { color: '#64748b', callback: v => '¥'+v+'万' }, grid: { color: CHART_DEFAULTS.grid } }
+      }
+    }
+  });
+}
+
+function buildSegmentPie() {
+  destroyChart('segPie');
+  const ctx = document.getElementById('segmentPieChart');
+  if (!ctx) return;
+  const vals = salesDetail.map(s => parseInt(s.sales.replace(/[¥万]/g,'')));
+  charts['segPie'] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: SEGMENTS,
+      datasets: [{ data: vals, backgroundColor: SEG_COLORS, borderWidth: 0, hoverOffset: 8 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true, cutout: '65%',
+      plugins: { legend: { display: false }, tooltip: CHART_DEFAULTS.tooltip }
+    }
+  });
+  const legend = document.getElementById('segment-legend');
+  if (legend) {
+    legend.innerHTML = '';
+    const total = vals.reduce((a,b)=>a+b,0);
+    salesDetail.forEach((s,i)=>{
+      const pct = ((vals[i]/total)*100).toFixed(1);
+      const el = document.createElement('div');
+      el.className = 'flex items-center justify-between text-xs';
+      el.innerHTML = '<div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-sm" style="background:' + SEG_COLORS[i] + '"></div><span class="text-slate-400">' + s.name + '</span></div><div class="flex items-center gap-3"><span class="text-white font-medium">' + s.sales + '</span><span class="text-slate-500">' + pct + '%</span></div>';
+      legend.appendChild(el);
+    });
+  }
+}
+
+function buildActivityChart() {
+  destroyChart('activity');
+  const ctx = document.getElementById('activityChart');
+  if (!ctx) return;
+  charts['activity'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: MONTHS,
+      datasets: [
+        { label:'MAU(万)', data: mauData, borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.1)', tension:0.4, fill:true, pointRadius:3 },
+        { label:'WAU(万)', data: [98,95,102,108,104,116], borderColor:'#34d399', backgroundColor:'rgba(52,211,153,0.05)', tension:0.4, fill:false, pointRadius:3 },
+        { label:'DAU(万)', data: [28,26,30,32,31,35], borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,0.05)', tension:0.4, fill:false, pointRadius:3 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { color:'#94a3b8', font:{size:11} } }, tooltip: CHART_DEFAULTS.tooltip },
+      scales: {
+        x: { ticks:{ color:'#64748b' }, grid:{ color: CHART_DEFAULTS.grid } },
+        y: { ticks:{ color:'#64748b' }, grid:{ color: CHART_DEFAULTS.grid } }
+      }
+    }
+  });
+}
+
+function buildMonthlyMAU() {
+  destroyChart('monthlyMau');
+  const ctx = document.getElementById('monthlyMauChart');
+  if (!ctx) return;
+  charts['monthlyMau'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: MONTHS,
+      datasets: [
+        { label:'2025 MAU(万)', data: mauData, borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.12)', tension:0.4, fill:true, pointRadius:4, pointBackgroundColor:'#6366f1' },
+        { label:'2024 MAU(万)', data: mauLastYear, borderColor:'#475569', backgroundColor:'transparent', borderDash:[5,4], tension:0.4, fill:false, pointRadius:3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend:{ labels:{ color:'#94a3b8', font:{size:11} } }, tooltip: CHART_DEFAULTS.tooltip },
+      scales: {
+        x: { ticks:{color:'#64748b'}, grid:{color: CHART_DEFAULTS.grid} },
+        y: { ticks:{color:'#64748b'}, grid:{color: CHART_DEFAULTS.grid} }
+      }
+    }
+  });
+}
+
+function buildMonthlySales() {
+  destroyChart('monthlySales');
+  const ctx = document.getElementById('monthlySalesChart');
+  if (!ctx) return;
+  // Compute MoM % for each segment
+  const momData = SEGMENTS.map((seg,si) => {
+    const arr = segMonthly[seg];
+    return MONTHS.map((_, mi) => mi === 0 ? 0 : parseFloat(((arr[mi]-arr[mi-1])/arr[mi-1]*100).toFixed(1)));
+  });
+  charts['monthlySales'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: MONTHS,
+      datasets: SEGMENTS.map((seg,i) => ({
+        label: seg,
+        data: momData[i],
+        backgroundColor: SEG_COLORS[i] + 'bb',
+        borderRadius: 4,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend:{ labels:{ color:'#94a3b8', font:{size:11} } }, tooltip: CHART_DEFAULTS.tooltip },
+      scales: {
+        x: { stacked:false, ticks:{color:'#64748b'}, grid:{color: CHART_DEFAULTS.grid} },
+        y: { ticks:{color:'#64748b', callback: v => v+'%'}, grid:{color: CHART_DEFAULTS.grid} }
+      }
+    }
+  });
+}
+
+function buildAnnualRevenue() {
+  destroyChart('annualRevenue');
+  const ctx = document.getElementById('annualRevenueChart');
+  if (!ctx) return;
+  const thisYear = [3820,3640,4010,4180,4050,4320,0,0,0,0,0,0];
+  const lastYear = [3240,3010,3480,3620,3550,3780,3900,4020,4150,4280,4420,4560];
+  charts['annualRevenue'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: MONTHS_FULL,
+      datasets: [
+        { label:'2025年（万元）', data: thisYear, backgroundColor:'rgba(99,102,241,0.75)', borderRadius:5, borderSkipped:false },
+        { label:'2024年（万元）', data: lastYear, backgroundColor:'rgba(71,85,105,0.5)', borderRadius:5, borderSkipped:false }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend:{ labels:{ color:'#94a3b8', font:{size:11} } }, tooltip: CHART_DEFAULTS.tooltip },
+      scales: {
+        x: { ticks:{color:'#64748b'}, grid:{color: CHART_DEFAULTS.grid} },
+        y: { ticks:{color:'#64748b', callback: v => '¥'+v+'万'}, grid:{color: CHART_DEFAULTS.grid} }
+      }
+    }
+  });
+}
+
+function buildAnnualSegment() {
+  destroyChart('annualSegment');
+  const ctx = document.getElementById('annualSegmentChart');
+  if (!ctx) return;
+  const thisY = [19580, 11790, 9290, 7140, 4120];
+  const lastY = [16565, 9632, 8022, 6342, 3773];
+  charts['annualSegment'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: SEGMENTS,
+      datasets: [
+        { label:'2025年（万元）', data: thisY, backgroundColor: SEG_COLORS.map(c=>c+'cc'), borderRadius:6, borderSkipped:false },
+        { label:'2024年（万元）', data: lastY, backgroundColor:'rgba(71,85,105,0.4)', borderRadius:6, borderSkipped:false }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend:{ labels:{ color:'#94a3b8', font:{size:11} } }, tooltip: CHART_DEFAULTS.tooltip },
+      scales: {
+        x: { ticks:{color:'#64748b', callback: v => v+'万'}, grid:{color: CHART_DEFAULTS.grid} },
+        y: { ticks:{color:'#94a3b8'}, grid:{color: CHART_DEFAULTS.grid} }
+      }
+    }
+  });
+}
+
+function buildSalesSegmentTrend() {
+  destroyChart('salesTrend');
+  const ctx = document.getElementById('salesSegmentTrendChart');
+  if (!ctx) return;
+  charts['salesTrend'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: MONTHS,
+      datasets: SEGMENTS.map((seg, i) => ({
+        label: seg,
+        data: segMonthly[seg],
+        borderColor: SEG_COLORS[i],
+        backgroundColor: SEG_COLORS[i] + '22',
+        tension: 0.4,
+        fill: false,
+        pointRadius: 4,
+        pointBackgroundColor: SEG_COLORS[i],
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend:{ labels:{ color:'#94a3b8', font:{size:11} } }, tooltip: CHART_DEFAULTS.tooltip },
+      scales: {
+        x: { ticks:{color:'#64748b'}, grid:{color: CHART_DEFAULTS.grid} },
+        y: { ticks:{color:'#64748b', callback: v => '¥'+v+'万'}, grid:{color: CHART_DEFAULTS.grid} }
+      }
+    }
+  });
+}
+
+function buildSalesUserPie() {
+  destroyChart('salesPie');
+  const ctx = document.getElementById('salesUserPieChart');
+  if (!ctx) return;
+  const paid = [247000, 182000, 124000, 96000, 38000];
+  charts['salesPie'] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: SEGMENTS,
+      datasets: [{ data: paid, backgroundColor: SEG_COLORS, borderWidth: 0, hoverOffset: 6 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true, cutout: '60%',
+      plugins: { legend:{ display:false }, tooltip: CHART_DEFAULTS.tooltip }
+    }
+  });
+  const legend = document.getElementById('sales-pie-legend');
+  if (legend) {
+    legend.innerHTML = '';
+    const total = paid.reduce((a,b)=>a+b,0);
+    SEGMENTS.forEach((seg,i)=>{
+      const pct = ((paid[i]/total)*100).toFixed(1);
+      const el = document.createElement('div');
+      el.className = 'flex items-center justify-between text-xs';
+      el.innerHTML = '<div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full" style="background:' + SEG_COLORS[i] + '"></div><span class="text-slate-400">' + seg + '</span></div><span class="text-slate-300">' + pct + '%</span>';
+      legend.appendChild(el);
+    });
+  }
+}
+
+// ─── TABLE RENDERERS ─────────────────────────────────────────────────
+function renderSegmentRankTable() {
+  const tbody = document.getElementById('segment-rank-table');
+  if (!tbody) return;
+  const data = [
+    { name:'电商零售', sales:'¥1,680万', mom:'+6.3%', pos:true },
+    { name:'企业服务', sales:'¥980万', mom:'+7.7%', pos:true },
+    { name:'内容付费', sales:'¥760万', mom:'+5.6%', pos:true },
+    { name:'游戏娱乐', sales:'¥580万', mom:'+7.4%', pos:true },
+    { name:'本地生活', sales:'¥320万', mom:'-5.9%', pos:false },
+  ];
+  let html = '';
+  data.forEach((d,i)=>{
+    const rank = ['🥇','🥈','🥉','4','5'][i];
+    const color = d.pos ? 'text-emerald-400' : 'text-rose-400';
+    html += '<tr><td class="py-2.5 text-sm text-slate-300"><span class="mr-2">' + rank + '</span>' + d.name + '</td><td class="py-2.5 text-right text-sm text-white font-medium">' + d.sales + '</td><td class="py-2.5 text-right text-sm ' + color + ' font-medium">' + d.mom + '</td></tr>';
+  });
+  tbody.innerHTML = html;
+}
+
+function renderMonthlyDetailTable() {
+  const tbody = document.getElementById('monthly-detail-table');
+  if (!tbody) return;
+  const rows = [
+    { m:'2025年6月', mau:'284.7万', new:'43.2万', orders:'186,420', sales:'¥4,320万', mom:'+6.7%', yoy:'+14.3%', ret:'68.3%', momPos:true, yoyPos:true },
+    { m:'2025年5月', mau:'253.1万', new:'40.5万', orders:'193,200', sales:'¥4,050万', mom:'-3.1%', yoy:'+14.1%', ret:'66.8%', momPos:false, yoyPos:true },
+    { m:'2025年4月', mau:'264.2万', new:'42.1万', orders:'196,500', sales:'¥4,180万', mom:'+4.2%', yoy:'+15.5%', ret:'67.2%', momPos:true, yoyPos:true },
+    { m:'2025年3月', mau:'253.4万', new:'39.8万', orders:'188,400', sales:'¥4,010万', mom:'+10.2%', yoy:'+15.2%', ret:'65.9%', momPos:true, yoyPos:true },
+    { m:'2025年2月', mau:'237.8万', new:'36.2万', orders:'171,200', sales:'¥3,640万', mom:'-4.7%', yoy:'+21.0%', ret:'64.2%', momPos:false, yoyPos:true },
+    { m:'2025年1月', mau:'241.2万', new:'38.4万', orders:'179,600', sales:'¥3,820万', mom:'+2.4%', yoy:'+17.9%', ret:'65.4%', momPos:true, yoyPos:true },
+  ];
+  let html = '';
+  rows.forEach(r=>{
+    const mc = r.momPos ? 'text-emerald-400' : 'text-rose-400';
+    const yc = r.yoyPos ? 'text-emerald-400' : 'text-rose-400';
+    html += '<tr><td class="py-3 text-slate-300 font-medium">' + r.m + '</td><td class="py-3 px-4 text-right text-white">' + r.mau + '</td><td class="py-3 px-4 text-right text-white">' + r.new + '</td><td class="py-3 px-4 text-right text-white">' + r.orders + '</td><td class="py-3 px-4 text-right text-white font-medium">' + r.sales + '</td><td class="py-3 px-4 text-right ' + mc + ' font-medium">' + r.mom + '</td><td class="py-3 px-4 text-right ' + yc + ' font-medium">' + r.yoy + '</td><td class="py-3 pl-4 text-right text-slate-300">' + r.ret + '</td></tr>';
+  });
+  tbody.innerHTML = html;
+}
+
+function renderAnnualDetailTable() {
+  const tbody = document.getElementById('annual-detail-table');
+  if (!tbody) return;
+  let html = '';
+  SEGMENTS.forEach((seg, si) => {
+    const d = annualData[seg];
+    const yoyPos = parseFloat(d[13]) > 0;
+    const yc = yoyPos ? 'text-emerald-400' : 'text-rose-400';
+    let cells = '';
+    for (let m = 0; m < 12; m++) {
+      const val = d[m];
+      const filled = m < 6;
+      cells += '<td class="py-3 px-2 text-right text-xs ' + (filled ? 'text-white' : 'text-slate-600') + '">' + (filled ? d[m] : '—') + '</td>';
+    }
+    html += '<tr><td class="py-3 pr-4 text-sm font-medium" style="color:' + SEG_COLORS[si] + '">' + seg + '</td>' + cells + '<td class="py-3 pl-4 text-right text-sm font-bold text-white">' + d[12] + '</td><td class="py-3 pl-4 text-right text-sm font-medium ' + yc + '">' + d[13] + '</td></tr>';
+  });
+  tbody.innerHTML = html;
+}
+
+function renderSalesDetailTable() {
+  const tbody = document.getElementById('sales-detail-table');
+  if (!tbody) return;
+  let html = '';
+  salesDetail.forEach((s,i)=>{
+    const mc = s.momVal > 0 ? 'text-emerald-400' : 'text-rose-400';
+    const yc = 'text-emerald-400';
+    html += '<tr><td class="py-3 pr-4"><div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-sm" style="background:' + s.color + '"></div><span class="text-white font-medium">' + s.name + '</span></div></td><td class="py-3 px-4 text-right text-slate-300">' + s.active + '</td><td class="py-3 px-4 text-right text-slate-300">' + s.paid + '</td><td class="py-3 px-4 text-right text-slate-300">' + s.conv + '</td><td class="py-3 px-4 text-right text-slate-300">' + s.orders + '</td><td class="py-3 px-4 text-right font-medium text-white">' + s.sales + '</td><td class="py-3 px-4 text-right text-slate-300">' + s.arpu + '</td><td class="py-3 px-4 text-right ' + mc + ' font-medium">' + s.mom + '</td><td class="py-3 pl-4 text-right ' + yc + ' font-medium">' + s.yoy + '</td></tr>';
+  });
+  tbody.innerHTML = html;
+}
+
+function renderSegmentCards() {
+  const container = document.getElementById('segment-cards');
+  if (!container) return;
+  let html = '';
+  salesDetail.forEach((s,i)=>{
+    const mc = s.momVal > 0 ? 'text-emerald-400' : 'text-rose-400';
+    const arrow = s.momVal > 0 ? 'arrow-up-right' : 'arrow-down-right';
+    html += '<div class="metric-card p-4" style="border-left:3px solid ' + s.color + '"><div class="flex items-center justify-between mb-3"><span class="text-sm font-semibold text-white">' + s.name + '</span><div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:' + s.bg + '"><i data-lucide="shopping-bag" class="w-4 h-4" style="color:' + s.color + '"></i></div></div><div class="text-2xl font-bold text-white mb-1">' + s.sales + '</div><div class="text-xs text-slate-500 mb-2">月销售额</div><div class="flex items-center gap-1"><i data-lucide="' + arrow + '" class="w-3.5 h-3.5 ' + mc + '"></i><span class="text-xs ' + mc + ' font-medium">' + s.mom + ' 环比</span></div><div class="text-xs text-emerald-400 mt-0.5">转化率 ' + s.conv + '</div></div>';
+  });
+  container.innerHTML = html;
+}
+
+function renderOverviewAlerts() {
+  const el = document.getElementById('overview-alert-list');
+  if (!el) return;
+  const top3 = alertsData.filter(a => a.level === 'critical').slice(0,3);
+  let html = '';
+  top3.forEach(a=>{
+    html += '<div class="alert-item alert-critical rounded-r-lg pl-3 pr-2 py-2.5"><div class="text-xs font-medium text-rose-300">' + a.title + '</div><div class="text-xs text-slate-500 mt-0.5">' + a.desc.substring(0,45) + '…</div><div class="text-xs text-slate-600 mt-1">' + a.time + '</div></div>';
+  });
+  el.innerHTML = html;
+}
+
+function renderFullAlerts() {
+  const el = document.getElementById('alerts-full-list');
+  if (!el) return;
+  const filtered = alertFilter === 'all' ? alertsData : alertsData.filter(a => a.level === alertFilter);
+  const lvlClasses = { critical:'alert-critical', warning:'alert-warning', info:'alert-info' };
+  const textClasses = { critical:'text-rose-300', warning:'text-amber-300', info:'text-indigo-300' };
+  const badgeClasses = { critical:'bg-red-500/20 text-red-400', warning:'bg-amber-500/20 text-amber-400', info:'bg-indigo-500/20 text-indigo-400' };
+  const badgeLabels = { critical:'严重', warning:'警告', info:'提示' };
+  let html = '';
+  filtered.forEach(a => {
+    html += '<div class="alert-item ' + lvlClasses[a.level] + ' rounded-r-xl px-4 py-3.5 flex items-start justify-between gap-4"><div class="flex-1"><div class="flex items-center gap-2 mb-1"><span class="text-xs font-medium px-2 py-0.5 rounded-full ' + badgeClasses[a.level] + '">' + badgeLabels[a.level] + '</span><span class="font-semibold text-sm ' + textClasses[a.level] + '">' + a.title + '</span></div><div class="text-xs text-slate-400">' + a.desc + '</div><div class="flex items-center gap-4 mt-1.5"><span class="text-xs text-slate-600">' + a.time + '</span><span class="text-xs text-slate-500 bg-white/5 px-2 py-0.5 rounded">' + a.metric + '</span></div></div></div>';
+  });
+  el.innerHTML = html || '<div class="text-center py-8 text-slate-500 text-sm">暂无该类型预警</div>';
+}
+
+function renderDownloadHistory() {
+  const tbody = document.getElementById('download-history-table');
+  if (!tbody) return;
+  const typeColor = { Excel:'text-emerald-400', PDF:'text-amber-400' };
+  let html = '';
+  dlHistory.forEach(d=>{
+    const tc = typeColor[d.type] || 'text-slate-400';
+    html += '<tr><td class="py-3 pr-4 text-slate-300">' + d.name + '</td><td class="py-3 px-4 ' + tc + ' font-medium">' + d.type + '</td><td class="py-3 px-4 text-slate-400">' + d.time + '</td><td class="py-3 px-4 text-slate-400">' + d.size + '</td><td class="py-3 pl-4 text-right"><button class="text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 px-3 py-1 rounded-lg transition-colors">重新下载</button></td></tr>';
+  });
+  tbody.innerHTML = html;
+}
+
+// ─── PAGE NAVIGATION ─────────────────────────────────────────────────
+const PAGE_CONFIG = {
+  'overview':  { navId:'nav-overview',  title:'总览仪表盘',    init: initOverview },
+  'monthly':   { navId:'nav-monthly',   title:'月度运营数据',  init: initMonthly },
+  'annual':    { navId:'nav-annual',    title:'年度运营数据',  init: initAnnual },
+  'sales':     { navId:'nav-sales',     title:'销售板块分析',  init: initSales },
+  'alerts':    { navId:'nav-alerts',    title:'异常预警中心',  init: initAlerts },
+  'download':  { navId:'nav-download',  title:'报表下载中心',  init: initDownload },
+};
+
+function showPage(key) {
+  if (!PAGE_CONFIG[key]) return;
+  currentPage = key;
+  // hide all pages
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + key).classList.add('active');
+  // update nav
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(PAGE_CONFIG[key].navId).classList.add('active');
+  // update title
+  document.getElementById('page-title').textContent = PAGE_CONFIG[key].title;
+  // run init
+  requestAnimationFrame(() => { PAGE_CONFIG[key].init(); });
+}
+
+function initOverview() {
+  renderOverviewAlerts();
+  renderSegmentRankTable();
+  buildRevenueTrend();
+  buildSegmentPie();
+  buildActivityChart();
+}
+function initMonthly() {
+  renderMonthlyDetailTable();
+  buildMonthlyMAU();
+  buildMonthlySales();
+}
+function initAnnual() {
+  renderAnnualDetailTable();
+  buildAnnualRevenue();
+  buildAnnualSegment();
+}
+function initSales() {
+  renderSegmentCards();
+  renderSalesDetailTable();
+  requestAnimationFrame(() => {
+    lucide.createIcons();
+    buildSalesSegmentTrend();
+    buildSalesUserPie();
+  });
+}
+function initAlerts() {
+  renderFullAlerts();
+}
+function initDownload() {
+  renderDownloadHistory();
+}
+
+// ─── TOAST ───────────────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  toast.classList.remove('translate-y-20','opacity-0');
+  toast.classList.add('translate-y-0','opacity-100');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toast.classList.add('translate-y-20','opacity-0');
+    toast.classList.remove('translate-y-0','opacity-100');
+    toastTimer = null;
+  }, 3000);
+}
+
+function simulateDownload(name) {
+  showToast(name + ' 生成成功，开始下载…');
+}
+
+// ─── CLICK DELEGATION ────────────────────────────────────────────────
+const clickActions = {
+  'nav-overview':       () => showPage('overview'),
+  'nav-monthly':        () => showPage('monthly'),
+  'nav-annual':         () => showPage('annual'),
+  'nav-sales':          () => showPage('sales'),
+  'nav-alerts':         () => showPage('alerts'),
+  'nav-download':       () => showPage('download'),
+  'header-alert-btn':   () => showPage('alerts'),
+  'header-download-btn':() => showPage('download'),
+  'view-all-alerts':    () => showPage('alerts'),
+  'trend-mom-btn': () => {
+    trendMode = 'mom';
+    document.getElementById('trend-mom-btn').classList.add('active');
+    document.getElementById('trend-yoy-btn').classList.remove('active');
+    buildRevenueTrend();
+  },
+  'trend-yoy-btn': () => {
+    trendMode = 'yoy';
+    document.getElementById('trend-yoy-btn').classList.add('active');
+    document.getElementById('trend-mom-btn').classList.remove('active');
+    buildRevenueTrend();
+  },
+  'month-prev': () => { if (currentMonth > 1) { currentMonth--; document.getElementById('month-label').textContent = '2025年'+currentMonth+'月'; } },
+  'month-next': () => { if (currentMonth < 12) { currentMonth++; document.getElementById('month-label').textContent = '2025年'+currentMonth+'月'; } },
+  'year-prev':  () => { currentYear--; document.getElementById('year-label').textContent = currentYear+'年'; },
+  'year-next':  () => { if (currentYear < 2025) { currentYear++; document.getElementById('year-label').textContent = currentYear+'年'; } },
+  'dl-monthly-btn':     () => simulateDownload('月度运营报表.xlsx'),
+  'dl-annual-btn':      () => simulateDownload('年度运营报表.xlsx'),
+  'dl-sales-btn':       () => simulateDownload('销售板块报表.xlsx'),
+  'dl-monthly-excel':   () => simulateDownload('月度运营报表.xlsx'),
+  'dl-monthly-pdf':     () => simulateDownload('月度运营报表.pdf'),
+  'dl-annual-excel':    () => simulateDownload('年度运营报表.xlsx'),
+  'dl-annual-pdf':      () => simulateDownload('年度运营报表.pdf'),
+  'dl-sales-excel':     () => simulateDownload('销售板块报表.xlsx'),
+  'dl-sales-pdf':       () => simulateDownload('销售板块报表.pdf'),
+  'dl-custom-btn':      () => {
+    const start = document.getElementById('custom-start').value;
+    const end = document.getElementById('custom-end').value;
+    const type = document.getElementById('custom-type').value;
+    simulateDownload(start + '至' + end + '_自定义报表.xlsx');
+  },
+  'alert-filter-all':      () => { alertFilter='all'; updateAlertFilter(); renderFullAlerts(); },
+  'alert-filter-critical': () => { alertFilter='critical'; updateAlertFilter(); renderFullAlerts(); },
+  'alert-filter-warning':  () => { alertFilter='warning'; updateAlertFilter(); renderFullAlerts(); },
+  'alert-filter-info':     () => { alertFilter='info'; updateAlertFilter(); renderFullAlerts(); },
+};
+
+function updateAlertFilter() {
+  ['all','critical','warning','info'].forEach(f => {
+    const btn = document.getElementById('alert-filter-'+f);
+    if (btn) btn.classList.toggle('active', f === alertFilter);
+  });
+}
+
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[id]');
+  if (!el) return;
+  const fn = clickActions[el.id];
+  if (fn) fn(e, el);
+});
+
+// ─── INIT ─────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  initOverview();
+  lucide.createIcons();
+});
+</script>
+<script>lucide.createIcons();</script>
+</body>
+</html>
